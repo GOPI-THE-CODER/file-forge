@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import MainLayout from './components/layout/MainLayout'
 import Home from './pages/Home'
 import Documents from './pages/Documents'
@@ -6,7 +6,7 @@ import Utilities from './pages/Utilities'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <MainLayout>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -14,6 +14,6 @@ export default function App() {
           <Route path="/utilities" element={<Utilities />} />
         </Routes>
       </MainLayout>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
