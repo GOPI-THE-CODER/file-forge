@@ -13,7 +13,7 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center">
-            <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
+            <div className="text-2xl font-bold bg-linear-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
               FileForge
             </div>
           </Link>
@@ -44,7 +44,7 @@ export default function Navbar() {
 
           {/* CTA Button */}
           <div className="hidden md:flex items-center">
-            <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-purple-500/50 transition">
+            <button className="px-4 py-2 rounded-lg bg-linear-to-r from-blue-500 to-purple-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-purple-500/50 transition">
               Get Started
             </button>
           </div>
@@ -97,7 +97,7 @@ export default function Navbar() {
             >
               Docs
             </a>
-            <button className="w-full mt-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium">
+            <button className="w-full mt-2 px-4 py-2 rounded-lg bg-linear-to-r from-blue-500 to-purple-600 text-white text-sm font-medium">
               Get Started
             </button>
           </div>

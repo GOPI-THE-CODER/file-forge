@@ -7,7 +7,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Brand */}
           <div>
-            <div className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent mb-2">
+            <div className="text-xl font-bold bg-linear-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent mb-2">
               FileForge
             </div>
             <p className="text-sm text-gray-400">

@@ -2,7 +2,7 @@ export default function Documents() {
   return (
     <main className="flex-1">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent mb-6">
+        <h1 className="text-4xl font-bold bg-linear-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent mb-6">
           Documents
         </h1>
         <div className="prose prose-invert max-w-none">
