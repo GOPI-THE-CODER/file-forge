@@ -1,19 +1,46 @@
 import { useState } from 'react'
+import QRCode from 'qrcode'
 
 export default function QrGenerator() {
   const [qrData, setQrData] = useState('')
   const [qrSize, setQrSize] = useState(300)
   const [errorCorrection, setErrorCorrection] = useState('M')
   const [generating, setGenerating] = useState(false)
+  const [previewSrc, setPreviewSrc] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
-  const handleGenerate = () => {
-    if (!qrData.trim()) {
-      alert('Please enter data for QR code')
+  const handleGenerate = async () => {
+    const trimmedData = qrData.trim()
+    if (!trimmedData) {
+      setErrorMessage('Please enter data for the QR code.')
+      setPreviewSrc('')
+      setStatusMessage('')
       return
     }
+
     setGenerating(true)
-    // TODO: Implement actual QR code generation logic
-    setTimeout(() => setGenerating(false), 1000)
+    setErrorMessage('')
+    setStatusMessage('Generating QR preview...')
+    setPreviewSrc('')
+
+    try {
+      const dataUrl = await QRCode.toDataURL(trimmedData, {
+        errorCorrectionLevel: errorCorrection,
+        width: qrSize,
+        margin: 1,
+        type: 'image/png',
+      })
+
+      setPreviewSrc(dataUrl)
+      setStatusMessage('QR code generated successfully.')
+    } catch (error) {
+      console.error('QR generation failed:', error)
+      setErrorMessage('Unable to generate the QR code. Try a shorter value or a different error correction level.')
+      setStatusMessage('')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   return (
@@ -103,12 +130,26 @@ export default function QrGenerator() {
         <div className="mt-8 rounded-3xl border border-slate-700 bg-slate-800/60 p-6">
           <h2 className="text-xl font-semibold text-white mb-4">Generated QR Code</h2>
           <div className="bg-slate-900/50 rounded-2xl p-8 flex flex-col items-center justify-center min-h-80">
-            <div className="text-center">
-              <div className="text-4xl mb-4">🔳</div>
-              <p className="text-slate-400">
-                Your QR code will appear here. Download as PNG or SVG.
-              </p>
-            </div>
+            {previewSrc ? (
+              <img
+                src={previewSrc}
+                alt="Generated QR code"
+                width={qrSize}
+                height={qrSize}
+                className="max-w-full rounded-2xl shadow-[0_0_60px_rgba(6,182,212,0.25)]"
+              />
+            ) : (
+              <div className="text-center">
+                <div className="text-4xl mb-4">🔳</div>
+                <p className="text-slate-400">
+                  Your QR code will appear here. Download as PNG or SVG.
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 text-center">
+            {statusMessage && <p className="text-slate-300 text-sm">{statusMessage}</p>}
+            {errorMessage && <p className="text-rose-400 text-sm">{errorMessage}</p>}
           </div>
         </div>
       </div>
