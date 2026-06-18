@@ -43,6 +43,21 @@ export default function QrGenerator() {
     }
   }
 
+  const handleDownload = () => {
+    if (!previewSrc) {
+      setErrorMessage('Generate a QR code before downloading.')
+      return
+    }
+
+    const link = document.createElement('a')
+    link.href = previewSrc
+    link.download = 'fileforge-qr.png'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setStatusMessage('Download started.')
+  }
+
   return (
     <main className="flex-1">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -147,6 +162,17 @@ export default function QrGenerator() {
               </div>
             )}
           </div>
+          {previewSrc && (
+            <div className="mt-5 flex justify-center">
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 hover:scale-105"
+              >
+                Download PNG
+              </button>
+            </div>
+          )}
           <div className="mt-4 text-center">
             {statusMessage && <p className="text-slate-300 text-sm">{statusMessage}</p>}
             {errorMessage && <p className="text-rose-400 text-sm">{errorMessage}</p>}
