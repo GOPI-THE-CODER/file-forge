@@ -9,6 +9,14 @@ import ImageConverter from './pages/ImageConverter'
 import ImageToPDF from './pages/ImageToPDF'
 import PassportPhotoMaker from './pages/PassportPhotoMaker'
 import SignatureResizer from './pages/SignatureResizer'
+import PdfMerger from './pages/PdfMerger'
+import PdfSplitter from './pages/PdfSplitter'
+import PdfCompressor from './pages/PdfCompressor'
+import PdfToImage from './pages/PdfToImage'
+import QrGenerator from './pages/QrGenerator'
+import BarcodeGenerator from './pages/BarcodeGenerator'
+import OcrTextExtractor from './pages/OcrTextExtractor'
+import FileMetadataViewer from './pages/FileMetadataViewer'
 
 export default function App() {
   return (
@@ -36,6 +44,14 @@ export default function App() {
   path="/signature-resizer"
   element={<SignatureResizer />}
 />
+          <Route path="/pdf-merger" element={<PdfMerger />} />
+          <Route path="/pdf-splitter" element={<PdfSplitter />} />
+          <Route path="/pdf-compressor" element={<PdfCompressor />} />
+          <Route path="/pdf-to-image" element={<PdfToImage />} />
+          <Route path="/qr-generator" element={<QrGenerator />} />
+          <Route path="/barcode-generator" element={<BarcodeGenerator />} />
+          <Route path="/ocr-text-extractor" element={<OcrTextExtractor />} />
+          <Route path="/file-metadata-viewer" element={<FileMetadataViewer />} />
         </Routes>
       </MainLayout>
     </HashRouter>

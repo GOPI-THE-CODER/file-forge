@@ -19,6 +19,23 @@ export default function Home() {
     }
   ]
 
+  const toolPages = [
+    { name: 'Image Compressor', path: '/image-compressor', description: 'Compress images to an exact KB size', icon: '🖼️' },
+    { name: 'Image Resizer', path: '/image-resizer', description: 'Resize images by width and height', icon: '📐' },
+    { name: 'Image Converter', path: '/image-converter', description: 'Convert PNG, JPG and WEBP images', icon: '🔄' },
+    { name: 'Image to PDF', path: '/image-to-pdf', description: 'Convert images into PDF documents', icon: '📝' },
+    { name: 'Passport Photo Maker', path: '/passport-photo-maker', description: 'Create passport-size photos', icon: '🪪' },
+    { name: 'Signature Resizer', path: '/signature-resizer', description: 'Resize signatures for forms and applications', icon: '✍️' },
+    { name: 'PDF Merger', path: '/pdf-merger', description: 'Combine multiple PDFs into one document', icon: '📎' },
+    { name: 'PDF Splitter', path: '/pdf-splitter', description: 'Split PDF files into individual pages', icon: '✂️' },
+    { name: 'PDF Compressor', path: '/pdf-compressor', description: 'Reduce PDF file size without losing quality', icon: '🗜️' },
+    { name: 'PDF to Image', path: '/pdf-to-image', description: 'Export PDF pages as PNG or JPG images', icon: '🖨️' },
+    { name: 'QR Generator', path: '/qr-generator', description: 'Generate QR codes for URLs and text', icon: '🔳' },
+    { name: 'Barcode Generator', path: '/barcode-generator', description: 'Create barcode images for inventory and labels', icon: '🏷️' },
+    { name: 'OCR Text Extractor', path: '/ocr-text-extractor', description: 'Extract text from images and PDFs', icon: '📄' },
+    { name: 'File Metadata Viewer', path: '/file-metadata-viewer', description: 'Inspect file metadata quickly and easily', icon: '🧾' }
+  ]
+
   const benefits = [
     {
       title: 'Lightning Fast',
@@ -109,30 +126,25 @@ export default function Home() {
               Powerful Tools at Your Fingertips
             </h2>
             <p className="text-sm md:text-base text-slate-400">
-              Explore our comprehensive suite of file management and utility tools
+              Explore our comprehensive suite of file management and utility tools.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {tools.map((tool, index) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            {toolPages.map((tool) => (
               <Link
-                key={index}
-                to={tool.link}
-                className="group p-6 rounded-xl border border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 hover:border-slate-600 transition-all duration-300"
+                key={tool.path}
+                to={tool.path}
+                className="group p-6 rounded-3xl border border-slate-700 bg-slate-800/60 hover:bg-slate-700/80 hover:border-cyan-500 transition-all duration-300"
               >
-                <div className="flex items-startjustify-between mb-3">
+                <div className="flex items-center justify-between mb-4">
                   <span className="text-3xl">{tool.icon}</span>
-                  <span className="text-slate-500">→</span>
+                  <span className="text-slate-500 group-hover:text-cyan-300 transition-colors">→</span>
                 </div>
-                <h3 className="text-lg font-bold text-white mb-1">{tool.title}</h3>
-                <p className="text-sm text-slate-400 mb-4">{tool.description}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {tool.features.map((feature, fIdx) => (
-                    <div key={fIdx} className="flex items-center gap-2 text-xs text-slate-300">
-                      <div className="w-1 h-1 rounded-full bg-blue-500"></div>
-                      {feature}
-                    </div>
-                  ))}
+                <h3 className="text-xl font-semibold text-white mb-3">{tool.name}</h3>
+                <p className="text-sm text-slate-400 mb-5">{tool.description}</p>
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500 font-medium">
+                  Open tool
                 </div>
               </Link>
             ))}
