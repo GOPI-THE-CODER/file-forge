@@ -9,19 +9,30 @@ export default function QrGenerator() {
   const [previewSrc, setPreviewSrc] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [messageType, setMessageType] = useState('') // 'success' or 'error'
 
   const handleGenerate = async () => {
     const trimmedData = qrData.trim()
+
     if (!trimmedData) {
-      setErrorMessage('Please enter data for the QR code.')
+      setErrorMessage('Please enter text or URL to generate a QR code.')
+      setMessageType('error')
       setPreviewSrc('')
       setStatusMessage('')
       return
     }
 
+    if (trimmedData.length > 2953) {
+      setErrorMessage('Input is too long. Maximum length is 2953 characters.')
+      setMessageType('error')
+      setPreviewSrc('')
+      return
+    }
+
     setGenerating(true)
     setErrorMessage('')
-    setStatusMessage('Generating QR preview...')
+    setStatusMessage('')
+    setMessageType('')
     setPreviewSrc('')
 
     try {
@@ -33,29 +44,75 @@ export default function QrGenerator() {
       })
 
       setPreviewSrc(dataUrl)
-      setStatusMessage('QR code generated successfully.')
+      setStatusMessage('✓ QR code generated successfully!')
+      setMessageType('success')
     } catch (error) {
       console.error('QR generation failed:', error)
       setErrorMessage('Unable to generate the QR code. Try a shorter value or a different error correction level.')
+      setMessageType('error')
       setStatusMessage('')
     } finally {
       setGenerating(false)
     }
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!previewSrc) {
-      setErrorMessage('Generate a QR code before downloading.')
+      setErrorMessage('Generate a QR code first before downloading.')
+      setMessageType('error')
       return
     }
 
-    const link = document.createElement('a')
-    link.href = previewSrc
-    link.download = 'fileforge-qr.png'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setStatusMessage('Download started.')
+    try {
+      const link = document.createElement('a')
+      link.href = previewSrc
+      link.download = `fileforge-qr-${Date.now()}.png`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setStatusMessage('✓ QR code downloaded successfully!')
+      setMessageType('success')
+      setErrorMessage('')
+    } catch (error) {
+      console.error('Download failed:', error)
+      setErrorMessage('Failed to download QR code.')
+      setMessageType('error')
+    }
+  }
+
+  const handleCopyImage = async () => {
+    if (!previewSrc) {
+      setErrorMessage('Generate a QR code first before copying.')
+      setMessageType('error')
+      return
+    }
+
+    try {
+      const response = await fetch(previewSrc)
+      const blob = await response.blob()
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': blob,
+        }),
+      ])
+      setStatusMessage('✓ QR code copied to clipboard!')
+      setMessageType('success')
+      setErrorMessage('')
+    } catch (error) {
+      console.error('Copy failed:', error)
+      setErrorMessage('Failed to copy QR code. Your browser may not support this feature.')
+      setMessageType('error')
+    }
+  }
+
+  const handleClear = () => {
+    setQrData('')
+    setPreviewSrc('')
+    setStatusMessage('')
+    setErrorMessage('')
+    setMessageType('')
+    setQrSize(300)
+    setErrorCorrection('M')
   }
 
   return (
@@ -82,6 +139,9 @@ export default function QrGenerator() {
                     placeholder="https://example.com or any text"
                     className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500 h-24 resize-none"
                   />
+                  <p className="text-xs text-slate-400 mt-2">
+                    {qrData.length}/2953 characters
+                  </p>
                 </div>
               </div>
             </div>
@@ -127,14 +187,22 @@ export default function QrGenerator() {
           <div className="lg:col-span-1">
             <div className="rounded-3xl border border-slate-700 bg-slate-800/60 p-6">
               <h2 className="text-xl font-semibold text-white mb-4">Action</h2>
-              <button
-                onClick={handleGenerate}
-                disabled={!qrData.trim() || generating}
-                className="w-full bg-linear-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-semibold py-3 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:scale-100 mb-4"
-              >
-                {generating ? 'Generating...' : 'Generate QR'}
-              </button>
-              <p className="text-slate-400 text-xs text-center">
+              <div className="space-y-3">
+                <button
+                  onClick={handleGenerate}
+                  disabled={!qrData.trim() || generating}
+                  className="w-full bg-linear-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-semibold py-3 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:scale-100"
+                >
+                  {generating ? '⏳ Generating...' : '✨ Generate QR'}
+                </button>
+                <button
+                  onClick={handleClear}
+                  className="w-full bg-linear-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white font-semibold py-3 rounded-lg transition-all duration-300 transform hover:scale-105"
+                >
+                  🔄 Clear
+                </button>
+              </div>
+              <p className="text-slate-400 text-xs text-center mt-3">
                 Your data is processed securely in your browser.
               </p>
             </div>
@@ -157,25 +225,44 @@ export default function QrGenerator() {
               <div className="text-center">
                 <div className="text-4xl mb-4">🔳</div>
                 <p className="text-slate-400">
-                  Your QR code will appear here. Download as PNG or SVG.
+                  Your QR code will appear here.
                 </p>
               </div>
             )}
           </div>
+
+          {/* Action Buttons */}
           {previewSrc && (
-            <div className="mt-5 flex justify-center">
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="bg-linear-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 hover:scale-105"
-              >
-                Download PNG
-              </button>
+            <div className="mt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <button
+                  onClick={handleDownload}
+                  className="bg-linear-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 text-sm"
+                >
+                  ⬇️ Download PNG
+                </button>
+                <button
+                  onClick={handleCopyImage}
+                  className="bg-linear-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 text-sm"
+                >
+                  📋 Copy Image
+                </button>
+              </div>
             </div>
           )}
-          <div className="mt-4 text-center">
-            {statusMessage && <p className="text-slate-300 text-sm">{statusMessage}</p>}
-            {errorMessage && <p className="text-rose-400 text-sm">{errorMessage}</p>}
+
+          {/* Status Messages */}
+          <div className="mt-6">
+            {statusMessage && (
+              <div className="p-4 bg-green-900/30 border border-green-700/50 rounded-lg">
+                <p className="text-green-400 text-sm font-semibold">{statusMessage}</p>
+              </div>
+            )}
+            {errorMessage && (
+              <div className="p-4 bg-rose-900/30 border border-rose-700/50 rounded-lg">
+                <p className="text-rose-400 text-sm font-semibold">{errorMessage}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
