@@ -33,7 +33,9 @@ export default function Home() {
     { name: 'QR Generator', path: '/qr-generator', description: 'Generate QR codes for URLs and text', icon: '🔳' },
     { name: 'Barcode Generator', path: '/barcode-generator', description: 'Create barcode images for inventory and labels', icon: '🏷️' },
     { name: 'OCR Text Extractor', path: '/ocr-text-extractor', description: 'Extract text from images and PDFs', icon: '📄' },
-    { name: 'File Metadata Viewer', path: '/file-metadata-viewer', description: 'Inspect file metadata quickly and easily', icon: '🧾' }
+    { name: 'File Metadata Viewer', path: '/file-metadata-viewer', description: 'Inspect file metadata quickly and easily', icon: '🧾' },
+    { name: 'QR & Barcode Scanner', path: '/qr-barcode-scanner', description: 'Scan QR and barcode codes quickly and easily', icon: '🔍' },
+    { name: 'Video Compressor', path: '/video-compressor', description: 'Compress videos locally in your browser', icon: '🧭' }
   ]
 
   const benefits = [

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { processSignature } from "../utils/signature/signatureProcessor";
 export default function SignatureResizer() {
   const [imageFile, setImageFile] = useState(null)
   const [originalPreview, setOriginalPreview] = useState(null)
@@ -23,7 +24,7 @@ export default function SignatureResizer() {
     setSignaturePreview(null)
   }
 
-  const generateSignature = () => {
+  const generateSignature = async () => {
     if (!imageFile) {
       alert('Please select a signature image.')
       return
@@ -41,181 +42,39 @@ if (sizePreset === '560x240') {
   targetHeight = 240
 }
 
-    const img = new Image()
+    try {
 
-    img.onload = () => {
-    
-      const canvas =
-        document.createElement('canvas')
+    const img = new Image();
 
-      canvas.width = targetWidth
-      canvas.height = targetHeight
+    img.onload = async () => {
 
-      const ctx =
-        canvas.getContext('2d')
-        ctx.imageSmoothingEnabled = true
-ctx.imageSmoothingQuality = 'high'
+        try {
 
-      // White Background
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(
-        0,
-        0,
-        targetWidth,
-        targetHeight
-      )
+            const output = await processSignature(
+                img,
+                targetWidth,
+                targetHeight
+            );
 
-      // Fit entire signature
-      // Auto Crop Signature
+            setSignaturePreview(output);
 
-const tempCanvas =
-  document.createElement('canvas')
+        } catch (error) {
 
-tempCanvas.width = img.width
-tempCanvas.height = img.height
+            console.error(error);
+            alert(error.message);
 
-const tempCtx =
-  tempCanvas.getContext('2d')
+        }
 
-tempCtx.drawImage(img, 0, 0)
+    };
 
-const imageData =
-  tempCtx.getImageData(
-    0,
-    0,
-    tempCanvas.width,
-    tempCanvas.height
-  )
+    img.src = URL.createObjectURL(imageFile);
 
-const data = imageData.data
+} catch (error) {
 
-let top = tempCanvas.height
-let left = tempCanvas.width
-let right = 0
-let bottom = 0
+    console.error(error);
+    alert("Failed to process signature.");
 
-for (let y = 0; y < tempCanvas.height; y++) {
-
-  for (let x = 0; x < tempCanvas.width; x++) {
-
-    const index =
-      (y * tempCanvas.width + x) * 4
-
-    const r = data[index]
-    const g = data[index + 1]
-    const b = data[index + 2]
-
-    const brightness =
-0.299 * r +
-0.587 * g +
-0.114 * b
-
-if (brightness < 250) {
-
-      top = Math.min(top, y)
-      left = Math.min(left, x)
-      right = Math.max(right, x)
-      bottom = Math.max(bottom, y)
-
-    }
-  }
 }
-const padding = 10
-
-left = Math.max(
-  0,
-  left - padding
-)
-
-top = Math.max(
-  0,
-  top - padding
-)
-
-right = Math.min(
-  tempCanvas.width,
-  right + padding
-)
-
-bottom = Math.min(
-  tempCanvas.height,
-  bottom + padding
-)
-
-const cropWidth =
-  right - left
-
-const cropHeight =
-  bottom - top
-const ratio = Math.min(
-  targetWidth / cropWidth,
-  targetHeight / cropHeight
-)
-
-const width =
-  cropWidth * ratio
-
-const height =
-  cropHeight * ratio
-
-const x =
-  (targetWidth - width) / 2
-
-const y =
-  (targetHeight - height) / 2
-
-ctx.drawImage(
-  tempCanvas,
-  left,
-  top,
-  cropWidth,
-  cropHeight,
-  x,
-  y,
-  width,
-  height
-)
-    if (enhanceSignature) {
-  try {
-    const imageData = ctx.getImageData(
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    )
-
-    const data = imageData.data
-
-    for (let i = 0; i < data.length; i += 4) {
-      const brightness =
-        (data[i] + data[i + 1] + data[i + 2]) / 3
-
-      if (brightness > 245) {
-        data[i] = 255
-        data[i + 1] = 255
-        data[i + 2] = 255
-     } else {
-  data[i] = Math.max(0, data[i] - 40)
-  data[i + 1] = Math.max(0, data[i + 1] - 40)
-  data[i + 2] = Math.max(0, data[i + 2] - 40)
-}
-
-    ctx.putImageData(imageData, 0, 0)
-  }} catch (error) {
-    console.error(error)
-  }
-  }
-
-const output =
-        canvas.toDataURL(
-          'image/png'
-        )
-
-      setSignaturePreview(output)
-    }
-
-    img.src =
-      URL.createObjectURL(imageFile)
   }
 
   const downloadSignature = () => {

@@ -3,6 +3,7 @@ export const toolRoutes = [
   { name: 'Image Resizer', path: '/image-resizer' },
   { name: 'Image Converter', path: '/image-converter' },
   { name: 'Image to PDF', path: '/image-to-pdf' },
+  { name: 'Video Compressor', path: '/video-compressor' },
   { name: 'Passport Photo Maker', path: '/passport-photo-maker' },
   { name: 'Signature Resizer', path: '/signature-resizer' },
   { name: 'PDF Merger', path: '/pdf-merger' },
@@ -12,5 +13,6 @@ export const toolRoutes = [
   { name: 'QR Generator', path: '/qr-generator' },
   { name: 'Barcode Generator', path: '/barcode-generator' },
   { name: 'OCR Text Extractor', path: '/ocr-text-extractor' },
-  { name: 'File Metadata Viewer', path: '/file-metadata-viewer' }
+  { name: 'File Metadata Viewer', path: '/file-metadata-viewer' },
+  { name: 'QR & Barcode Scanner', path: '/qr-barcode-scanner' }
 ]

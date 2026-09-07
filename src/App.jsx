@@ -17,6 +17,8 @@ import QrGenerator from './pages/QrGenerator'
 import BarcodeGenerator from './pages/BarcodeGenerator'
 import OcrTextExtractor from './pages/OcrTextExtractor'
 import FileMetadataViewer from './pages/FileMetadataViewer'
+import QrBarcodeScanner from './pages/QrBarcodeScanner'
+import VideoCompressor from './pages/VideoCompressor'
 
 export default function App() {
   return (
@@ -52,6 +54,9 @@ export default function App() {
           <Route path="/barcode-generator" element={<BarcodeGenerator />} />
           <Route path="/ocr-text-extractor" element={<OcrTextExtractor />} />
           <Route path="/file-metadata-viewer" element={<FileMetadataViewer />} />
+          <Route path="/qr-barcode-scanner" element={<QrBarcodeScanner />} />
+          <Route path="/qr-barcode-scanner" element={<QrBarcodeScanner />} />
+          <Route path="/video-compressor" element={<VideoCompressor />} />
         </Routes>
       </MainLayout>
     </HashRouter>

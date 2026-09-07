@@ -71,7 +71,12 @@ export default function Utilities() {
       name: 'File Metadata Viewer',
       path: '/file-metadata-viewer',
       description: 'Inspect file metadata quickly and easily'
-    }
+    },
+    {
+  name: 'Video Compressor',
+  path: '/video-compressor',
+  description: 'Compress videos locally in your browser'
+}
   ]
 
   return (

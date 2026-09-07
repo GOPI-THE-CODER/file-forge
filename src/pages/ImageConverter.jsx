@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 const ImageConverter = () => {
   const [imageFile, setImageFile] = useState(null);
@@ -6,68 +6,222 @@ const ImageConverter = () => {
 
   const [originalSize, setOriginalSize] = useState(0);
   const [originalFormat, setOriginalFormat] = useState("");
+  const [originalDimensions, setOriginalDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
 
   const [format, setFormat] = useState("image/png");
-  const [quality, setQuality] = useState(0.9);
+
+  // Maximum practical quality.
+  const [quality, setQuality] = useState(1);
 
   const [convertedImage, setConvertedImage] = useState(null);
   const [convertedSize, setConvertedSize] = useState(0);
+  const [convertedDimensions, setConvertedDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
+
+  const [converting, setConverting] = useState(false);
 
   const formatBytes = (bytes) => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024)
-      return (bytes / 1024).toFixed(2) + " KB";
+    if (!bytes) return "0 B";
 
-    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(2)} KB`;
+    }
+
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
-  const handleUpload = (e) => {
-    const file = e.target.files[0];
+  const formatDimensions = (width, height) => {
+    if (!width || !height) return "—";
+
+    return `${width.toLocaleString()} × ${height.toLocaleString()} px`;
+  };
+
+  const getImageDimensions = (file) => {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+
+      img.onload = () => {
+        resolve({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+
+        URL.revokeObjectURL(objectUrl);
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Unable to read this image."));
+      };
+
+      img.src = objectUrl;
+    });
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
 
     if (!file) return;
 
-    setImageFile(file);
-    setPreview(URL.createObjectURL(file));
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file.");
+      return;
+    }
 
-    setOriginalSize(file.size);
-    setOriginalFormat(file.type);
+    try {
+      const dimensions = await getImageDimensions(file);
 
-    setConvertedImage(null);
-    setConvertedSize(0);
+      // Release previous preview.
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+
+      setImageFile(file);
+      setPreview(URL.createObjectURL(file));
+
+      setOriginalSize(file.size);
+      setOriginalFormat(file.type);
+      setOriginalDimensions(dimensions);
+
+      setConvertedImage(null);
+      setConvertedSize(0);
+      setConvertedDimensions({
+        width: 0,
+        height: 0,
+      });
+    } catch (error) {
+      console.error(error);
+      alert("Unable to read this image.");
+    }
   };
 
-  const convertImage = () => {
-    if (!imageFile) return;
+  const convertImage = async () => {
+    if (!imageFile || converting) return;
 
-    const img = new Image();
+    setConverting(true);
+    setConvertedImage(null);
+    setConvertedSize(0);
 
-    img.onload = () => {
+    try {
+      const objectUrl = URL.createObjectURL(imageFile);
+
+      const img = new Image();
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+
+        img.onerror = () => {
+          reject(new Error("Failed to load the image."));
+        };
+
+        img.src = objectUrl;
+      });
+
+      /*
+       * IMPORTANT:
+       *
+       * Use the original pixel dimensions.
+       * We never resize the image here.
+       */
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+
+      if (!width || !height) {
+        throw new Error("Invalid image dimensions.");
+      }
+
       const canvas = document.createElement("canvas");
 
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = width;
+      canvas.height = height;
 
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", {
+        alpha: true,
+        colorSpace: "srgb",
+      });
 
-      ctx.drawImage(img, 0, 0);
+      if (!ctx) {
+        throw new Error("Your browser could not create a canvas.");
+      }
 
-      const convertedDataUrl = canvas.toDataURL(
-        format,
-        quality
+      /*
+       * High-quality image rendering.
+       */
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
+      /*
+       * White background is required when converting
+       * transparent images to JPEG.
+       */
+      if (format === "image/jpeg") {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      /*
+       * Draw at EXACT original pixel dimensions.
+       */
+      ctx.drawImage(
+        img,
+        0,
+        0,
+        width,
+        height
       );
 
-      setConvertedImage(convertedDataUrl);
+      /*
+       * Convert canvas directly to Blob.
+       *
+       * This is better than using a huge Base64 Data URL.
+       */
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (result) => {
+            if (result) {
+              resolve(result);
+            } else {
+              reject(
+                new Error("Image conversion failed.")
+              );
+            }
+          },
+          format,
+          format === "image/png" ? undefined : quality
+        );
+      });
 
-      const base64Length =
-        convertedDataUrl.split(",")[1].length;
+      const convertedUrl = URL.createObjectURL(blob);
 
-      const bytes =
-        Math.round((base64Length * 3) / 4);
+      setConvertedImage(convertedUrl);
+      setConvertedSize(blob.size);
 
-      setConvertedSize(bytes);
-    };
+      setConvertedDimensions({
+        width,
+        height,
+      });
 
-    img.src = URL.createObjectURL(imageFile);
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error("Image conversion failed:", error);
+
+      alert(
+        error?.message ||
+          "Image conversion failed. Please try another image."
+      );
+    } finally {
+      setConverting(false);
+    }
   };
 
   const downloadImage = () => {
@@ -80,15 +234,38 @@ const ImageConverter = () => {
         ? "webp"
         : "png";
 
+    const originalName =
+      imageFile?.name
+        ?.replace(/\.[^/.]+$/, "")
+        || "fileforge-image";
+
     const link = document.createElement("a");
 
     link.href = convertedImage;
-    link.download = `fileforge-converted.${extension}`;
+
+    link.download =
+      `${originalName}-converted.${extension}`;
 
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
   };
+
+  const cleanupPreview = () => {
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
+
+    if (convertedImage) {
+      URL.revokeObjectURL(convertedImage);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      cleanupPreview();
+    };
+  }, [preview, convertedImage]);
 
   return (
     <div
@@ -108,18 +285,27 @@ const ImageConverter = () => {
 
       {preview && (
         <>
-          <div style={{ marginTop: "20px" }}>
+          {/* Preview */}
+          <div
+            style={{
+              marginTop: "20px",
+            }}
+          >
             <img
               src={preview}
-              alt="Preview"
+              alt="Original preview"
               style={{
+                display: "block",
                 maxWidth: "100%",
-                maxHeight: "350px",
+                maxHeight: "500px",
+                width: "auto",
+                height: "auto",
                 borderRadius: "10px",
               }}
             />
           </div>
 
+          {/* Original information */}
           <div
             style={{
               marginTop: "20px",
@@ -144,24 +330,35 @@ const ImageConverter = () => {
               <strong>Size:</strong>{" "}
               {formatBytes(originalSize)}
             </p>
+
+            <p>
+              <strong>Resolution:</strong>{" "}
+              {formatDimensions(
+                originalDimensions.width,
+                originalDimensions.height
+              )}
+            </p>
           </div>
 
+          {/* Output format */}
           <div
             style={{
               marginTop: "20px",
             }}
           >
             <label>
-              Output Format:
+              <strong>Output Format:</strong>
             </label>
 
             <br />
 
             <select
               value={format}
-              onChange={(e) =>
-                setFormat(e.target.value)
-              }
+              onChange={(e) => {
+                setFormat(e.target.value);
+                setConvertedImage(null);
+                setConvertedSize(0);
+              }}
               style={{
                 padding: "10px",
                 marginTop: "8px",
@@ -169,19 +366,20 @@ const ImageConverter = () => {
               }}
             >
               <option value="image/png">
-                PNG
+                PNG — Lossless
               </option>
 
               <option value="image/jpeg">
-                JPG
+                JPG — High Quality
               </option>
 
               <option value="image/webp">
-                WEBP
+                WEBP — High Quality
               </option>
             </select>
           </div>
 
+          {/* Quality */}
           {(format === "image/jpeg" ||
             format === "image/webp") && (
             <div
@@ -190,16 +388,19 @@ const ImageConverter = () => {
               }}
             >
               <label>
-                Quality: {Math.round(quality * 100)}%
+                <strong>
+                  Quality:{" "}
+                  {Math.round(quality * 100)}%
+                </strong>
               </label>
 
               <br />
 
               <input
                 type="range"
-                min="0.1"
+                min="0.8"
                 max="1"
-                step="0.1"
+                step="0.01"
                 value={quality}
                 onChange={(e) =>
                   setQuality(
@@ -208,24 +409,37 @@ const ImageConverter = () => {
                 }
                 style={{
                   width: "300px",
+                  maxWidth: "100%",
                 }}
               />
+
+              <p>
+                100% = maximum available encoding
+                quality.
+              </p>
             </div>
           )}
 
+          {/* Convert */}
           <button
             onClick={convertImage}
+            disabled={converting}
             style={{
               marginTop: "20px",
               padding: "12px 24px",
-              cursor: "pointer",
+              cursor: converting
+                ? "wait"
+                : "pointer",
             }}
           >
-            Convert Image
+            {converting
+              ? "Converting..."
+              : "Convert Image"}
           </button>
         </>
       )}
 
+      {/* Converted result */}
       {convertedImage && (
         <div
           style={{
@@ -238,8 +452,11 @@ const ImageConverter = () => {
             src={convertedImage}
             alt="Converted"
             style={{
+              display: "block",
               maxWidth: "100%",
-              maxHeight: "350px",
+              maxHeight: "500px",
+              width: "auto",
+              height: "auto",
               borderRadius: "10px",
             }}
           />
@@ -247,6 +464,9 @@ const ImageConverter = () => {
           <div
             style={{
               marginTop: "15px",
+              padding: "15px",
+              border: "1px solid #ddd",
+              borderRadius: "10px",
             }}
           >
             <p>
@@ -257,6 +477,24 @@ const ImageConverter = () => {
             <p>
               <strong>Size:</strong>{" "}
               {formatBytes(convertedSize)}
+            </p>
+
+            <p>
+              <strong>Resolution:</strong>{" "}
+              {formatDimensions(
+                convertedDimensions.width,
+                convertedDimensions.height
+              )}
+            </p>
+
+            <p>
+              <strong>Resolution preserved:</strong>{" "}
+              {originalDimensions.width ===
+                convertedDimensions.width &&
+              originalDimensions.height ===
+                convertedDimensions.height
+                ? "✓ Yes"
+                : "⚠ No"}
             </p>
           </div>
 
