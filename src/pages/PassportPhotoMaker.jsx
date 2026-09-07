@@ -9,6 +9,11 @@ const PASSPORT_WIDTH = 413
 const PASSPORT_HEIGHT = 531
 const BLUE_BACKGROUND = '#4A90E2'
 
+// Keep the AI workloads bounded for large phone-camera images.
+// The final passport output is only 413 × 531 px, so the AI does not need
+// the full multi-megapixel source image to make the framing/edge decisions.
+const MAX_AI_DIMENSION = 1600
+
 /*
  * Vite public assets are normally served from "/" during development
  * and from BASE_URL in production.
@@ -141,10 +146,6 @@ const createForegroundFromMask = (
     throw new Error('Could not create foreground canvas.')
   }
 
-  /*
-   * Draw the original image first.
-   * This preserves the original RGB pixels.
-   */
   ctx.drawImage(
     originalImage,
     0,
@@ -160,9 +161,6 @@ const createForegroundFromMask = (
     height
   )
 
-  /*
-   * Draw the AI mask separately.
-   */
   const maskCanvas = document.createElement('canvas')
   maskCanvas.width = width
   maskCanvas.height = height
@@ -190,21 +188,36 @@ const createForegroundFromMask = (
     height
   )
 
-  /*
-   * Keep original RGB and replace only alpha.
-   *
-   * Very faint mask pixels are removed to reduce
-   * dirty/gray halos around the person.
-   */
-  for (let i = 0; i < width * height; i++) {
-    const index = i * 4
-    const alpha = maskData.data[index + 3]
+  let minX = width
+  let minY = height
+  let maxX = -1
+  let maxY = -1
 
-    if (alpha < 18) {
-      originalData.data[index + 3] = 0
-    } else {
-      originalData.data[index + 3] = alpha
+  let index = 0
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const alpha = maskData.data[index + 3]
+
+      if (alpha < 18) {
+        originalData.data[index + 3] = 0
+      } else {
+        originalData.data[index + 3] = alpha
+
+        if (alpha >= 32) {
+          if (x < minX) minX = x
+          if (y < minY) minY = y
+          if (x > maxX) maxX = x
+          if (y > maxY) maxY = y
+        }
+      }
+
+      index += 4
     }
+  }
+
+  if (maxX < 0 || maxY < 0) {
+    throw new Error('Could not detect the person in the image.')
   }
 
   ctx.putImageData(
@@ -213,77 +226,110 @@ const createForegroundFromMask = (
     0
   )
 
+  maskCanvas.width = 1
+  maskCanvas.height = 1
+
+  return {
+    canvas,
+    bounds: {
+      x: minX,
+      y: minY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1,
+    },
+  }
+}
+
+const createScaledCanvas = (
+  source,
+  scale
+) => {
+  const width = Math.max(
+    1,
+    Math.round(source.width * scale)
+  )
+
+  const height = Math.max(
+    1,
+    Math.round(source.height * scale)
+  )
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const ctx = canvas.getContext('2d')
+
+  if (!ctx) {
+    throw new Error('Could not prepare scaled image.')
+  }
+
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(source, 0, 0, width, height)
+
   return canvas
 }
 
-/*
- * Find the complete visible person from the
- * segmentation mask.
- *
- * This is used only for safety.
- * It does NOT determine passport subject size.
- */
-const getForegroundBounds = (image) => {
-  const canvas = document.createElement('canvas')
+const createReducedAiImage = (
+  image,
+  maxDimension = MAX_AI_DIMENSION
+) => {
+  const largestDimension =
+    Math.max(
+      image.width,
+      image.height
+    )
 
-  canvas.width = image.width
-  canvas.height = image.height
-
-  const ctx = canvas.getContext('2d', {
-    willReadFrequently: true,
-  })
-
-  if (!ctx) {
-    throw new Error('Could not analyze foreground image.')
-  }
-
-  ctx.drawImage(
-    image,
-    0,
-    0,
-    image.width,
-    image.height
-  )
-
-  const { data } = ctx.getImageData(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  )
-
-  const alphaThreshold = 32
-
-  let minX = canvas.width
-  let minY = canvas.height
-  let maxX = -1
-  let maxY = -1
-
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      const alpha =
-        data[(y * canvas.width + x) * 4 + 3]
-
-      if (alpha >= alphaThreshold) {
-        if (x < minX) minX = x
-        if (y < minY) minY = y
-        if (x > maxX) maxX = x
-        if (y > maxY) maxY = y
-      }
+  if (
+    largestDimension <= maxDimension
+  ) {
+    return {
+      source: image,
+      scale: 1,
     }
   }
 
-  if (maxX < 0 || maxY < 0) {
-    throw new Error(
-      'Could not detect the person in the image.'
-    )
+  const scale =
+    maxDimension /
+    largestDimension
+
+  return {
+    source:
+      createScaledCanvas(
+        image,
+        scale
+      ),
+    scale,
+  }
+}
+
+const scaleFaceBox = (
+  box,
+  scale
+) => {
+  if (
+    !box ||
+    !Number.isFinite(scale) ||
+    scale <= 0
+  ) {
+    return box
   }
 
   return {
-    x: minX,
-    y: minY,
-    width: maxX - minX + 1,
-    height: maxY - minY + 1,
+    ...box,
+    originX:
+      Number(box.originX) /
+      scale,
+    originY:
+      Number(box.originY) /
+      scale,
+    width:
+      Number(box.width) /
+      scale,
+    height:
+      Number(box.height) /
+      scale,
   }
 }
 
@@ -293,7 +339,9 @@ const getForegroundBounds = (image) => {
  * If multiple people are present, the largest face
  * is treated as the main passport subject.
  */
-const getLargestFace = (detections) => {
+const getLargestFace = (
+  detections
+) => {
   if (!detections?.length) {
     return null
   }
@@ -302,14 +350,18 @@ const getLargestFace = (detections) => {
   let largestArea = 0
 
   for (const detection of detections) {
-    const box = detection?.boundingBox
+    const box =
+      detection?.boundingBox
 
     if (!box) {
       continue
     }
 
-    const width = Number(box.width)
-    const height = Number(box.height)
+    const width =
+      Number(box.width)
+
+    const height =
+      Number(box.height)
 
     if (
       !Number.isFinite(width) ||
@@ -320,9 +372,12 @@ const getLargestFace = (detections) => {
       continue
     }
 
-    const area = width * height
+    const area =
+      width * height
 
-    if (area > largestArea) {
+    if (
+      area > largestArea
+    ) {
       largestArea = area
       largest = box
     }
@@ -343,10 +398,17 @@ const normalizeFaceBox = (
     return null
   }
 
-  const x = Number(box.originX)
-  const y = Number(box.originY)
-  const width = Number(box.width)
-  const height = Number(box.height)
+  const x =
+    Number(box.originX)
+
+  const y =
+    Number(box.originY)
+
+  const width =
+    Number(box.width)
+
+  const height =
+    Number(box.height)
 
   if (
     !Number.isFinite(x) ||
@@ -359,34 +421,47 @@ const normalizeFaceBox = (
     return null
   }
 
-  const left = Math.max(
-    0,
-    Math.min(imageWidth, x)
-  )
-
-  const top = Math.max(
-    0,
-    Math.min(imageHeight, y)
-  )
-
-  const right = Math.max(
-    left,
-    Math.min(
-      imageWidth,
-      x + width
+  const left =
+    Math.max(
+      0,
+      Math.min(
+        imageWidth,
+        x
+      )
     )
-  )
 
-  const bottom = Math.max(
-    top,
-    Math.min(
-      imageHeight,
-      y + height
+  const top =
+    Math.max(
+      0,
+      Math.min(
+        imageHeight,
+        y
+      )
     )
-  )
 
-  const safeWidth = right - left
-  const safeHeight = bottom - top
+  const right =
+    Math.max(
+      left,
+      Math.min(
+        imageWidth,
+        x + width
+      )
+    )
+
+  const bottom =
+    Math.max(
+      top,
+      Math.min(
+        imageHeight,
+        y + height
+      )
+    )
+
+  const safeWidth =
+    right - left
+
+  const safeHeight =
+    bottom - top
 
   if (
     safeWidth <= 0 ||
@@ -404,55 +479,6 @@ const normalizeFaceBox = (
 }
 
 /*
- * Scale the complete foreground proportionally.
- *
- * Used only if the requested passport frame is larger
- * than the available source image.
- */
-const createScaledCanvas = (
-  source,
-  scale
-) => {
-  const width = Math.max(
-    1,
-    Math.round(source.width * scale)
-  )
-
-  const height = Math.max(
-    1,
-    Math.round(source.height * scale)
-  )
-
-  const canvas =
-    document.createElement('canvas')
-
-  canvas.width = width
-  canvas.height = height
-
-  const ctx =
-    canvas.getContext('2d')
-
-  if (!ctx) {
-    throw new Error(
-      'Could not prepare scaled foreground.'
-    )
-  }
-
-  ctx.imageSmoothingEnabled = true
-  ctx.imageSmoothingQuality = 'high'
-
-  ctx.drawImage(
-    source,
-    0,
-    0,
-    width,
-    height
-  )
-
-  return canvas
-}
-
-/*
  * FACE-AWARE PASSPORT FRAMING
  *
  * The face controls subject scale.
@@ -467,7 +493,8 @@ const getFaceAwareCrop = (
   humanBounds
 ) => {
   const passportRatio =
-    PASSPORT_WIDTH / PASSPORT_HEIGHT
+    PASSPORT_WIDTH /
+    PASSPORT_HEIGHT
 
   /*
    * Face height as a percentage of final passport
@@ -476,14 +503,17 @@ const getFaceAwareCrop = (
    * 0.34 gives a reasonably large passport portrait
    * while leaving space for hair and shoulders.
    */
-  const targetFaceFraction = 0.34
+  const targetFaceFraction =
+    0.34
 
   /*
    * Target vertical location of face top.
    */
-  const targetFaceTopFraction = 0.18
+  const targetFaceTopFraction =
+    0.18
 
-  let source = foreground
+  let source =
+    foreground
 
   let face = {
     ...faceBox,
@@ -513,10 +543,13 @@ const getFaceAwareCrop = (
     cropWidth > source.width ||
     cropHeight > source.height
   ) {
-    const scale = Math.min(
-      source.width / cropWidth,
-      source.height / cropHeight
-    )
+    const scale =
+      Math.min(
+        source.width /
+          cropWidth,
+        source.height /
+          cropHeight
+      )
 
     if (
       !Number.isFinite(scale) ||
@@ -536,15 +569,19 @@ const getFaceAwareCrop = (
     face = {
       x: face.x * scale,
       y: face.y * scale,
-      width: face.width * scale,
-      height: face.height * scale,
+      width:
+        face.width * scale,
+      height:
+        face.height * scale,
     }
 
     person = {
       x: person.x * scale,
       y: person.y * scale,
-      width: person.width * scale,
-      height: person.height * scale,
+      width:
+        person.width * scale,
+      height:
+        person.height * scale,
     }
 
     cropHeight *= scale
@@ -573,23 +610,25 @@ const getFaceAwareCrop = (
   /*
    * Keep crop inside image.
    */
-  cropX = Math.max(
-    0,
-    Math.min(
-      cropX,
-      source.width -
-        cropWidth
+  cropX =
+    Math.max(
+      0,
+      Math.min(
+        cropX,
+        source.width -
+          cropWidth
+      )
     )
-  )
 
-  cropY = Math.max(
-    0,
-    Math.min(
-      cropY,
-      source.height -
-        cropHeight
+  cropY =
+    Math.max(
+      0,
+      Math.min(
+        cropY,
+        source.height -
+          cropHeight
+      )
     )
-  )
 
   /*
    * HAIR SAFETY
@@ -615,40 +654,52 @@ const getFaceAwareCrop = (
   if (
     cropY > desiredTop
   ) {
-    cropY = desiredTop
+    cropY =
+      desiredTop
   }
 
   /*
    * Re-clamp after hair protection.
    */
-  cropY = Math.max(
-    0,
-    Math.min(
-      cropY,
-      source.height -
-        cropHeight
+  cropY =
+    Math.max(
+      0,
+      Math.min(
+        cropY,
+        source.height -
+          cropHeight
+      )
     )
-  )
 
   const x =
-    Math.round(cropX)
+    Math.round(
+      cropX
+    )
 
   const y =
-    Math.round(cropY)
+    Math.round(
+      cropY
+    )
 
   const width =
-    Math.round(cropWidth)
+    Math.round(
+      cropWidth
+    )
 
   const height =
-    Math.round(cropHeight)
+    Math.round(
+      cropHeight
+    )
 
   if (
     width <= 0 ||
     height <= 0 ||
     x < 0 ||
     y < 0 ||
-    x + width > source.width ||
-    y + height > source.height
+    x + width >
+      source.width ||
+    y + height >
+      source.height
   ) {
     throw new Error(
       'Could not calculate a valid passport frame.'
@@ -663,6 +714,31 @@ const getFaceAwareCrop = (
     height,
   }
 }
+
+const canvasToBlob = (
+  canvas,
+  type = 'image/jpeg',
+  quality = 0.95
+) =>
+  new Promise(
+    (resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob)
+          } else {
+            reject(
+              new Error(
+                'Could not prepare the AI processing image.'
+              )
+            )
+          }
+        },
+        type,
+        quality
+      )
+    }
+  )
 
 export default function PassportPhotoMaker() {
   const [imageFile, setImageFile] =
@@ -887,9 +963,14 @@ export default function PassportPhotoMaker() {
           'Detecting face and setting framing...'
         )
 
+        const faceDetectionImage =
+          createReducedAiImage(
+            originalImage
+          )
+
         const faceResult =
           faceDetector.detect(
-            originalImage
+            faceDetectionImage.source
           )
 
         const faceBox =
@@ -899,7 +980,10 @@ export default function PassportPhotoMaker() {
 
         const normalizedFace =
           normalizeFaceBox(
-            faceBox,
+            scaleFaceBox(
+              faceBox,
+              faceDetectionImage.scale
+            ),
             originalImage.width,
             originalImage.height
           )
@@ -923,11 +1007,34 @@ export default function PassportPhotoMaker() {
           'Loading background-removal AI...'
         )
 
+        const segmentationImage =
+          createReducedAiImage(
+            originalImage
+          )
+
+        const segmentationSource =
+          segmentationImage.source ===
+          originalImage
+            ? imageFile
+            : await canvasToBlob(
+                segmentationImage.source,
+                imageFile.type === 'image/png'
+                  ? 'image/png'
+                  : 'image/jpeg',
+                0.95
+              )
+
         const maskBlob =
           await segmentForeground(
-            imageFile,
+            segmentationSource,
             {
               model: 'isnet',
+              debug: false,
+              device:
+                typeof navigator !== 'undefined' &&
+                'gpu' in navigator
+                  ? 'gpu'
+                  : 'cpu',
 
               output: {
                 format: 'image/png',
@@ -1021,17 +1128,22 @@ export default function PassportPhotoMaker() {
           )
         }
 
-        const foregroundCanvas =
+        const foregroundResult =
           createForegroundFromMask(
             originalImage,
             maskImage
           )
+
+        const foregroundCanvas =
+          foregroundResult.canvas
 
         /*
          * STEP 5
          * Find human bounds for hair/edge safety.
          *
          * Face still controls framing.
+         * The bounds are collected during mask application
+         * so the full-resolution image is not scanned twice.
          */
         setProgress(78)
 
@@ -1040,9 +1152,7 @@ export default function PassportPhotoMaker() {
         )
 
         const humanBounds =
-          getForegroundBounds(
-            foregroundCanvas
-          )
+          foregroundResult.bounds
 
         const crop =
           getFaceAwareCrop(
